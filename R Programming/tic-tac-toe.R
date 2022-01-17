@@ -39,7 +39,7 @@ avalible_slots <- c(11,12,13,21,22,23,31,32,33)
 
 ## function to check if there is a winner
 check_a_winner = function(board){
-  # check first di-angle 
+  # check first diagonal 
   di_1 = c(board[1,1],board[2,2],board[3,3])
   U_lett = unique(di_1)
   U_num = length(U_lett)
@@ -47,7 +47,7 @@ check_a_winner = function(board){
     return (U_lett)
   }
   
-  # check second di-angle
+  # check second diagonal
   di_2 = c(board[3,1],board[2,2],board[1,3])
   U_lett = unique(di_2)
   U_num = length(U_lett)
@@ -110,7 +110,7 @@ check_a_winner = function(board){
 ## The computer game play
 # winning move 
 go_for_win = function(board,comp.choice){
-  # check first di-angle 
+  # check first diagonal 
   di_1 = c(board[1,1],board[2,2],board[3,3])
   all_pos = c(1,2,3)
   
@@ -275,13 +275,13 @@ comp_play = function(board,comp.choice,avalible_slots,user.choice) {
     cnr = go_win[1]
     cnc = go_win[2]
     board[cnr, cnc] = comp.choice
-    output = '\n\n#####################\n\n'
-    cat(output)
-    print(board)
-    cat(output)
-    outcome_of_game = paste0('###    Player ',comp.choice,' WON!!!!    ###')
+    # output = '\n\n#####################\n\n'
+    # cat(output)
+    # print(board)
+    # cat(output)
+    # outcome_of_game = paste0('###    Player ',comp.choice,' WON!!!!    ###')
     winner = comp.choice
-    
+    return(c(cnr,cnc))
   }
   
   go_win = go_for_win(board,user.choice) # stop player winning
@@ -290,6 +290,7 @@ comp_play = function(board,comp.choice,avalible_slots,user.choice) {
   if (go_win != 'continue'){
     cnr = go_win[1]
     cnc = go_win[2]
+    return(c(cnr,cnc))
   }
   
   
@@ -438,7 +439,10 @@ while(outcome_of_game == 'continue') {
 
 }
 
-
+output = '\n\n#####################\n\n'
+cat(output)
+print(board)
+cat(output)
 
 cat(paste0('\n\n\n',outcome_of_game,'\n\n\n'))
 
