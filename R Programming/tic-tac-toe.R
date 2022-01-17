@@ -1,9 +1,11 @@
 ## tic tack toe
-print('the script works')
+
 
 # create a matrix for the board
 correct <- FALSE
 check = NA
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# st user and computer choice
 while( correct == FALSE) {
   cat("Pick X or O\n")
   user.choice <- readLines("stdin",n=1)
@@ -27,10 +29,11 @@ output = '\n\n#####################\n\n'
 cat(output)
 print(board)
 cat(output)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # start the game
 outcome_of_game <- 'continue'
-game_cycle = 0
+game_cycle = 1
 
 avalible_slots <- c(11,12,13,21,22,23,31,32,33)
 
@@ -178,6 +181,7 @@ go_for_win = function(board,comp.choice){
 
       return(c(2,mat_index))
     }
+
   }
   
   # check third row
@@ -253,16 +257,63 @@ go_for_win = function(board,comp.choice){
       return(c(mat_index,3))
     }
   }
-  return('continue')
+  result = 'continue'
+  return(result)
   
 }
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# function for the computers selection
+comp_play = function(board,comp.choice,avalible_slots,user.choice) {
   
+  
+  #check
+  go_win = go_for_win(board,comp.choice) # win
+  
+  
+  if (go_win != 'continue'){
+    cnr = go_win[1]
+    cnc = go_win[2]
+    board[cnr, cnc] = comp.choice
+    output = '\n\n#####################\n\n'
+    cat(output)
+    print(board)
+    cat(output)
+    outcome_of_game = paste0('###    Player ',comp.choice,' WON!!!!    ###')
+    winner = comp.choice
+    
+  }
+  
+  go_win = go_for_win(board,user.choice) # stop player winning
+  
+  
+  if (go_win != 'continue'){
+    cnr = go_win[1]
+    cnc = go_win[2]
+  }
+  
+  
+  if (go_win == 'continue'){
+    comp_slot = sample(avalible_slots,1)
+    cnr = as.integer(substr(comp_slot,1,1))
+    cnc = as.integer(substr(comp_slot,2,2))
+  }
+  
+  # print(paste0('computer row: ',cnr))
+  # print(paste0('computer column: ',cnc))
+  
+  check <- as.integer(paste0(cnr,cnc))
+  
+  avalible_slots <<- avalible_slots[! avalible_slots %in% c(check) ]
+  
+  return(c(cnr,cnc))
+  
+}
 
 
-
-while(outcome_of_game == 'continue') {
-  avalible_slots <- avalible_slots[! avalible_slots %in% c(check) ]
-# select user row
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# function for the computers selection
+user_play = function(board,user.choice,avalible_slots) {
   cat("\nchoose a row number: ")
   ur <- readLines('stdin',n=1)
   ur <- as.integer(ur)
@@ -285,7 +336,7 @@ while(outcome_of_game == 'continue') {
     uc <- readLines('stdin',n=1)
     uc <- as.integer(uc)
   }
- 
+  
   
   game_cycle = game_cycle + 1
   
@@ -303,7 +354,7 @@ while(outcome_of_game == 'continue') {
     found_in_list <- FALSE
   }
   
-
+  
   if (found_in_list == FALSE ) {
     cat(paste0('\nused the row and column: ', ur,uc,'\n\n'))
     cat("choose a row number: ")
@@ -316,59 +367,59 @@ while(outcome_of_game == 'continue') {
     uc <- as.integer(uc)
     
   }
-  board[ur, uc] = user.choice
   
+  check <- as.integer(paste0(ur,uc))
+  avalible_slots <<- avalible_slots[! avalible_slots %in% c(check) ]
+  
+  return(c(ur,uc))
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+while(outcome_of_game == 'continue') {
+  
+  # check if its a draw
+  if (game_cycle >=9) {
+    outcome_of_game = '###    DRAW    ###'
+    break
+  }
+  
+  
+  # user input
+  if (game_cycle == 1 && user.choice == 'O'){
+    outcome_of_game = 'continue'
+  } else{
+    user_move = user_play(board,user.choice,avalible_slots)
+   
+    ur = as.integer(user_move[1])
+    uc = as.integer(user_move[2])
+   
+    board[ur,uc] = user.choice
+    game_cycle = game_cycle + 1
+  }
   # check if player won 
   winner = check_a_winner(board)
-  
   if (winner == user.choice){
     output = '\n\n#####################\n\n'
     cat(output)
     print(board)
     cat(output)
-    outcome_of_game = paste0('###    Player ',user.choice,  ' WON!!!!    ###')
+    outcome_of_game = paste0('###    Player ',user.choice,' WON!!!!    ###')
     break
   }
-  # output = '\n\n#####################\n\n'
-  # cat(output)
-  # print(board)
-  # cat(output)
   
-  # remove user slot
-  avalible_slots <- avalible_slots[! avalible_slots %in% c(check) ]
-  go_win = go_for_win(board,comp.choice) # win
-  if (go_win != 'continue'){
-    cnr = go_win[1]
-    cnc = go_win[2]
-    board[cnr, cnc] = comp.choice
-    output = '\n\n#####################\n\n'
-    cat(output)
-    print(board)
-    cat(output)
-    outcome_of_game = paste0('###    Player ',comp.choice,' WON!!!!    ###')
+  # check if its a draw
+  if (game_cycle >=9) {
+    outcome_of_game = '###    DRAW    ###'
     break
-    
   }
   
-  go_win = go_for_win(board,user.choice) # stop player winning
-  if (go_win != 'continue'){
-    cnr = go_win[1]
-    cnc = go_win[2]
-  }
-  
-  
-  if (go_win == 'continue'){
-    comp_slot = sample(avalible_slots,1)
-    cnr = as.integer(substr(comp_slot,1,1))
-    cnc = as.integer(substr(comp_slot,2,2))
-  }
-  
-  # print(paste0('computer row: ',cnr))
-  # print(paste0('computer column: ',cnc))
- 
-  check <- as.integer(paste0(cnr,cnc))
   # computer enters
-  board[cnr, cnc] = comp.choice
+  comp_move = comp_play(board,comp.choice,avalible_slots,user.choice)
+  
+  
+  board[comp_move[1], comp_move[2]] = comp.choice
   output = '\n\n#####################\n\n'
   cat(output)
   print(board)
@@ -384,6 +435,7 @@ while(outcome_of_game == 'continue') {
     break
   }
   
+
 }
 
 
