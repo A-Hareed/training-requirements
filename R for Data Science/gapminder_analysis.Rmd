@@ -1,0 +1,147 @@
+---
+title: "gapminder analysis"
+author: "Ayub Hareed"
+date: "18/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# load libraries
+
+library(tidyverse)
+```
+
+## Read the gapminder csv data:
+
+```{r read file}
+
+my_data <- read.csv('../gapminder_clean.csv') 
+# change to a tibble
+my_data <- as.tibble(my_data)
+head(my_data)
+```
+
+## CO2 emissions in 1962
+
+one of the data points (Kuwait) skews the data and can be taken as an outlier
+
+```{r CO2 emissions}
+my_data_1962 <- filter(my_data,my_data$Year == 1962)
+  
+ggplot(data = my_data_1962,aes(x = gdpPercap,y = CO2.emissions..metric.tons.per.capita.)) +
+geom_point() +
+labs(title = 'CO2 emissions vs GDP')
+
+
+```
+
+Kuwait datasets
+
+```{r pressure}
+my_data_1962 %>% 
+  filter(my_data_1962$gdpPercap > 50000)
+
+```
+
+
+## scatter plot without Kuwait data
+
+
+```{r }
+my_data_1962 %>% 
+  filter(my_data_1962$gdpPercap < 50000) %>%
+  ggplot(aes(x = gdpPercap,y = CO2.emissions..metric.tons.per.capita.)) +
+  geom_point() +
+  labs(title = 'CO2 emissions vs GDP')
+
+```
+
+
+## Calculate Pearson's R value 
+
+. The **r** value is: 0.9260817
+. The **p** value is: less than 2.2e-16
+
+```{r pressure, echo=FALSE}
+
+x <- as.matrix(my_data_1962[,'gdpPercap'])
+y <- as.matrix(my_data_1962[,'CO2.emissions..metric.tons.per.capita.'])
+dim(x)
+dim(y)
+cor.test(x = x,y = y)
+```
+
+## Person correletion without Kuwait data:
+The correlation coefficient is lower when the Kuwait data 
+
+. The **r** value is: 0.8063295
+. The **p** value is: less than 2.2e-16
+
+
+```{r pressure, echo=FALSE}
+my_data_1962_without_kuwait <- filter(my_data_1962,gdpPercap < 50000)
+dim(my_data_1962)
+dim(my_data_1962_without_kuwait)
+
+x_without_kuwait <- as.matrix(my_data_1962_without_kuwait[,'gdpPercap'])
+y_without_kuwait <- as.matrix(my_data_1962_without_kuwait[,'CO2.emissions..metric.tons.per.capita.'])
+dim(x_without_kuwait)
+dim(y_without_kuwait)
+cor.test(x = x_without_kuwait,y = y_without_kuwait)
+```
+
+## Calculate correlation for each year:
+
+```{r }
+my_data_grouped <- my_data %>% 
+
+```
+
+
+## Calculate
+
+```{r }
+
+
+```
+
+
+## Calculate correlation for each year:
+
+```{r }
+
+
+```
+
+
+
+
+
+## 
+
+
+```{r pressure, echo=FALSE}
+?cor.test
+?drop_na
+%>%
+  cor.test()
+
+
+
+gdp_V_co2 <- my_data_1962 %>% 
+  drop_na(gdpPercap,CO2.emissions..metric.tons.per.capita.) %>%
+  select(gdpPercap,CO2.emissions..metric.tons.per.capita.) 
+x <- as.matrix(gdp_V_co2[,1])
+y <- as.matrix(gdp_V_co2[,2])
+dim(x)
+dim(y)
+cor.test(x = x,y = y)
+
+
+
+```
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
