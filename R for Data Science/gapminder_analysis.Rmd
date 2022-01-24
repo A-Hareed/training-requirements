@@ -2,13 +2,25 @@
 title: "gapminder analysis"
 author: "Ayub Hareed"
 date: "18/01/2022"
-output: html_document
+output:
+  rmdformats::downcute:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: false
+    highlight: tango
+
 ---
+
 
 ```{r setup, include=FALSE}
 # load libraries
-
+library(knitr)
+library(reactable)
 library(tidyverse)
+library(RColorBrewer)
+library(plotly)
+
 ```
 
 ## Read the gapminder csv data:
@@ -18,7 +30,8 @@ library(tidyverse)
 my_data <- read.csv('../gapminder_clean.csv') 
 # change to a tibble
 my_data <- as.tibble(my_data)
-head(my_data)
+reactable(my_data)
+?reactable
 ```
 
 ## CO2 emissions in 1962
@@ -62,7 +75,7 @@ my_data_1962 %>%
 . The **r** value is: 0.9260817
 . The **p** value is: less than 2.2e-16
 
-```{r pressure, echo=FALSE}
+```{r correlation test, echo=FALSE}
 
 x <- as.matrix(my_data_1962[,'gdpPercap'])
 y <- as.matrix(my_data_1962[,'CO2.emissions..metric.tons.per.capita.'])
@@ -78,7 +91,7 @@ The correlation coefficient is lower when the Kuwait data
 . The **p** value is: less than 2.2e-16
 
 
-```{r pressure, echo=FALSE}
+```{r , echo=FALSE}
 my_data_1962_without_kuwait <- filter(my_data_1962,gdpPercap < 50000)
 dim(my_data_1962)
 dim(my_data_1962_without_kuwait)
@@ -91,55 +104,193 @@ cor.test(x = x_without_kuwait,y = y_without_kuwait)
 ```
 
 ## Calculate correlation for each year:
+Note: NA values are removed before calculation for mean values
+
+The year 1967 has the strongest correlation with an r value of 0.9387918
 
 ```{r }
-my_data_grouped <- my_data %>% 
+my_data_grouped <- my_data %>% group_by(Year)
+my_data_grouped %>% 
+  summarise(
+  R_value = cor.test(x = gdpPercap,y = CO2.emissions..metric.tons.per.capita.,)$estimate,
+  P_value = cor.test(x = gdpPercap,y = CO2.emissions..metric.tons.per.capita.,)$p.value
+)
+
 
 ```
 
 
-## Calculate
+
+
+## Filter dataset to only include 1967 data
+
+```{r }
+my_data_1967 <- my_data %>% filter(Year == 1967)
+my_data_1967
+```
+
+
+
+
+## ploting a plotly scatter plot:
+
+```{r }
+g = ggplot(data = my_data_1967, aes(x = gdpPercap, 
+                                y = CO2.emissions..metric.tons.per.capita.,
+                                name = Country.Name, 
+                                )) +
+  geom_point(aes(color = continent,
+                 size = pop, 
+                 alpha = 0.5)) 
+ggplotly(g)
+
+```
+
+# Part two
+
+## 1.  continent vs Energy use:
+**box plot** that shows the variations between the continents
+
+```{r }
+my_data_continent_grouped <-
+  my_data %>% group_by(continent) %>% # group by continent
+  drop_na() %>%     # remove missing values
+  select(continent,
+         Energy.use..kg.of.oil.equivalent.per.capita.) # don't include the missing continent
+df_continent_grouped = as.data.frame(my_data_continent_grouped)
+dim(df_continent_grouped)
+# plot box plot
+boxplot(Energy.use..kg.of.oil.equivalent.per.capita. ~ continent, data = df_continent_grouped)
+```
+
+
+### Carry out an Anova test to see if  the difference between the continent is significant.
+
+The tests p-Value is less than <2e-16 showing that their is a significant different between the continent
+
+```{r}
+model.aov <- aov(Energy.use..kg.of.oil.equivalent.per.capita. ~ continent, data = df_continent_grouped)
+summary(model.aov)
+model.aov$coefficients
+```
+
+
+
+## 2. difference between Europe and Asia with respect to 'Imports of goods and services (% of GDP)'
+
+Using an Anova test between Asia and Europe
+
+```{r }
+my_data_Asia_Europe <- 
+  my_data %>% 
+  filter(Year >= 1990 & continent == 'Asia' | continent == 'Europe') %>%
+  drop_na() %>%
+  select(continent,Year,
+         Imports.of.goods.and.services....of.GDP.)
+boxplot(Imports.of.goods.and.services....of.GDP. ~ continent, data = my_data_Asia_Europe)
+```
+
+
+**Anova test**
+```{r anova}
+model.aov2 <- aov(Imports.of.goods.and.services....of.GDP. ~ continent, data = my_data_Asia_Europe)
+summary(model.aov2)
+```
+There anova results shows that there is a significant difference between
+Europe and Asia with respect to 'Imports of goods and services' in the years 
+after 1990
+
+## Life expactancy after 1962:
+1. Create a data frame that contains **country name**, **year** and **life expectancy**.
+1. Then group them by country 
+
+```{r }
+my_data_life_expactancy <- 
+  my_data %>%
+  select(Country.Name,Year,Life.expectancy.at.birth..total..years.)
+# drop missing values
+my_data_life_expactancy <- my_data_life_expactancy %>%
+  drop_na() %>%
+  group_by(Country.Name)
+
+
+my_data_life_expactancy
+
+```
+
+```{r }
+ggplot(data = my_data_life_expactancy,
+       aes(x= Year,
+           y= Life.expectancy.at.birth..total..years. )) +
+  geom_point(aes(color = Country.Name), show.legend = FALSE)
+  
+```
+
+
+## Calculate the total precentage change for each country:
+
+To do this first the year-on-year change in the seven year gap is calculated.
+
+
+```{r }
+# calculate the percentage change over the years
+df_life_exp <- 
+  my_data_life_expactancy %>%
+  mutate(pct_change = (Life.expectancy.at.birth..total..years./lag(Life.expectancy.at.birth..total..years.) -1 )*100) %>%
+  summarise(
+    total_change = sum(pct_change,na.rm = TRUE)
+  )
+ 
+df_life_exp %>% arrange(desc(total_change)) %>%
+  slice_head(n=5)
+```  
+## plot the highest five and lowest five countries in total growth 
+
+```{r}
+df_life_exp_upper <- 
+  df_life_exp %>% arrange(desc(total_change)) %>%
+  slice_head(n=5)
+
+df_life_exp_lower <- 
+  df_life_exp %>% arrange(desc(total_change)) %>%
+  slice_tail(n=5)
+df_life_exp_highest_n_lowest <- bind_rows(df_life_exp_upper,df_life_exp_lower)
+
+country_name_vec <- as.vector(df_life_exp_highest_n_lowest$Country.Name)
+
+# length(country_name.vec)
+df_life_exp_highest_n_lowest_full <- my_data_life_expactancy[my_data_life_expactancy$Country.Name %in% country_name_vec,]
+
+
+ggplot(data = df_life_exp_highest_n_lowest_full, aes(x = Year, y = Life.expectancy.at.birth..total..years.)) +
+  geom_point(aes(color = Country.Name)) +
+  geom_line(aes(color = Country.Name)) +
+  ggtitle( 'Life expectancy from 1960')
+  
+```
+
+According to this data Cambodia have under gone the highest rate of growth in 
+life expectancy.
+
+** plot of year on year change of the same plot
 
 ```{r }
 
+df_life_exp_year_on_year <- 
+  my_data_life_expactancy %>%
+  mutate(pct_change = (Life.expectancy.at.birth..total..years./lag(Life.expectancy.at.birth..total..years.) -1 )*100)
+
+
+
+df_life_exp_year_on_year[my_data_life_expactancy$Country.Name %in% country_name_vec,] %>%
+  ggplot(aes(x= Year, y = pct_change)) +
+  geom_point(aes(color = Country.Name)) + 
+  geom_line(aes(color = Country.Name))
+
+barplot(total_change ~ Country.Name, data = df_life_exp_highest_n_lowest, col= brewer.pal(10,"Set3"))
 
 ```
 
-
-## Calculate correlation for each year:
-
-```{r }
-
-
-```
-
-
-
-
-
-## 
-
-
-```{r pressure, echo=FALSE}
-?cor.test
-?drop_na
-%>%
-  cor.test()
-
-
-
-gdp_V_co2 <- my_data_1962 %>% 
-  drop_na(gdpPercap,CO2.emissions..metric.tons.per.capita.) %>%
-  select(gdpPercap,CO2.emissions..metric.tons.per.capita.) 
-x <- as.matrix(gdp_V_co2[,1])
-y <- as.matrix(gdp_V_co2[,2])
-dim(x)
-dim(y)
-cor.test(x = x,y = y)
-
-
-
-```
 
 
 
