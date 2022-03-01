@@ -1,0 +1,371 @@
+---
+title: "RNA-Seq analysis"
+author: "Ayub Hareed"
+date: "25/01/2022"
+output:
+  rmdformats::downcute:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: false
+    highlight: tango
+
+---
+## Libraries and packages 
+
+```{r libraries,}
+library(recount)
+library(reactable)
+library(plotly)
+library(reshape2)
+library(clusterProfiler)
+library(DESeq2)
+library(biomaRt)
+library(org.Hs.eg.db)
+library(pheatmap)
+library(tidyverse)
+
+```
+
+## Download the RNA-Seq count data from **recount2** using **recount**
+
+```{r Get Count data}
+if(!file.exists(file.path("ERP010786", "rse_gene.Rdata"))) {
+  download_study("ERP010786",type = 'rse-gene')
+}
+# check if file exsists
+file.exists(file.path("ERP010786", "rse_gene.Rdata"))
+```
+
+## load count data 
+
+```{r load counts data}
+load(file.path("ERP010786", "rse_gene.Rdata"))
+```
+
+```{r}
+assays(rse_gene)$counts %>% head %>% reactable()
+
+```
+
+check the Dimensions of the data and the column names 
+```{r}
+rowRanges(rse_gene)
+dim(colData(rse_gene))
+colnames(colData(rse_gene))
+```
+## load sra table:
+this 
+```{r}
+sra_table <- read_csv("monocytogene_SraRunTable.txt")
+reactable(sra_table)
+
+
+```
+
+### Select columns: 
+```{r}
+# colData(rse_gene)['title'] <- 
+select_col <- c('Run','disease','Sample Name')
+short_sra_table <- sra_table[,select_col]
+reactable(short_sra_table)
+
+```
+
+
+
+create a factor that has levels where the control/baseline is uninfected cells and add it to counts colData. 
+
+```{r}
+
+disease_factor <- factor(short_sra_table$disease, levels = c('Uninfected','Listeria infection'))
+short_sra_table['disease'] <- disease_factor
+short_sra_table
+
+colData(rse_gene)$conditions <- disease_factor
+colData(rse_gene)$conditions
+
+```
+
+
+## Scale the count data using **scale_counts()**
+
+```{r}
+rse_gene_scaled <- scale_counts(rse_gene)
+assays(rse_gene)$counts %>% head
+
+assays(rse_gene_scaled)$counts %>% head
+```
+
+## Plot barplot of the count data
+
+
+
+```{r}
+
+tmp <- melt(assays(rse_gene_scaled)$counts)
+names(tmp) <- c('genes','sample','counts')
+
+ggplot(data = tmp, aes(x = sample,y =counts)) +
+  geom_col()
+
+```
+
+
+
+## Upload count data into DESeq:
+
+```{r}
+dds <- DESeqDataSet(rse_gene_scaled, ~ conditions)
+dds$conditions
+
+```
+
+## remove Ensemble gene id version and just keep the identifier 
+
+```{r}
+## remove the gene version: 
+rownames(dds) %>% head  # before the replacement
+rownames(dds) <- gsub("\\..*","",rownames(dds))  
+rownames(dds) %>% head    # after replacement
+```
+
+
+## Differential Gene analysis:
+
+
+```{r}
+dds <- DESeq(dds)
+dds
+
+```
+
+## HCluster plot and  
+
+
+```{r}
+# varience stable
+vst_all <- varianceStabilizingTransformation(dds)
+```
+```{r}
+d = assay(vst_all)
+d = t(d)
+d = dist(d)
+d
+h = hclust(d)
+plot(h,main='Cluster Dendrogram for 6 samples:')
+
+```
+
+
+## result: 
+
+
+```{r}
+res <- results(dds)
+summary(res)
+# reactable(as.data.frame(res))
+dim(dds)
+dim(res)
+6311+5885+1+7302
+58037 - 35428
+```
+
+## filter out the high p-values and log2FoldChange that is "less than 1 and greater than -1"
+
+
+```{r}
+# drop missing values from padj
+res <- res[!is.na(res$padj),]
+dim(res)
+# drop missing values from log2FoldChange
+res <- res[!is.na(res$log2FoldChange),]
+dim(res)
+dim(res[res$padj < 0.05 & abs(res$log2FoldChange) > 1,])
+# add column that shows genes that pass the threshold 
+res$test <- res$padj < 0.05 & abs(res$log2FoldChange) > 1
+filterd_res <- res[res$padj < 0.05 & abs(res$log2FoldChange) > 1,]
+
+
+```
+## Plot a Volcano plot and MA plot
+
+
+
+```{r}
+#plot MA from DESeq
+DESeq2::plotMA(res, main = 'MA plot')
+
+
+```
+```{r}
+#plot Volcano 
+df_res <- as.data.frame(res)
+ggplot(df_res,aes(x=log2FoldChange, y=-log10(padj),name = test)) +
+  geom_point(aes(color = test)) +
+  geom_vline(xintercept = 1,linetype = 3) +
+  geom_vline(xintercept = -1,linetype = 3) +
+  geom_hline(yintercept = -log10(0.05),linetype = 3) +
+  ggtitle('Volcano Plot') +
+  theme_bw()
+```
+
+
+## search gene names from 
+
+```{r biomart}
+
+df_res <- rownames_to_column(df_res,var = 'ensgene')
+head(df_res)
+ensembl <- useEnsembl(biomart = 'ensembl')
+ensembl <- useDataset('hsapiens_gene_ensembl',mart = ensembl)
+annotations <- getBM(
+  attributes = c('ensembl_gene_id',
+                 'chromosome_name',
+                 'start_position','end_position',
+                 'strand','gene_biotype',
+                 'external_gene_name',
+                 'description'),
+  filters =  c('ensembl_gene_id'),
+  values = df_res$ensgene,
+  mart = ensembl
+    
+)
+
+```
+## BioMart annotation results:
+
+```{r}
+reactable(annotations)
+head(annotations)
+```
+
+## join the annotaed data frame with the result dataframe using ensembl gene name
+
+
+```{r}
+df_anno <- left_join(df_res,annotations,by = c('ensgene'='ensembl_gene_id' ) )
+head(df_anno)
+head(df_res)
+View(df_anno[is.na(df_anno$external_gene_name),])
+dim(annotations) -dim(df_res)
+
+```
+
+
+## filter only significant genes 
+By using threshold of a adjusted p-values less than 0.05 and a absolute log2 fold change greater than 1
+
+```{r}
+df_anno_filtered <- df_anno[df_anno$padj < 0.05 & abs(df_anno$log2FoldChange) > 1,]
+dim(df_anno_filtered[is.na(df_anno_filtered$external_gene_name),])
+
+
+degs <- df_anno_filtered$ensgene
+
+vst_anno <- vst_all[degs,]
+dim(vst_anno)
+assay(vst_anno) %>% head()
+rownames(vst_anno) <- df_anno_filtered$external_gene_name
+#df_anno_filtered[df_anno_filtered$external_gene_name == 'LAP3',]
+assay(vst_all) %>% head
+#tmp <- rownames_to_column(as.data.frame(assay(vst_all)))
+#head(tmp)
+```
+
+
+## Heatmap to show differential gene expression between the samples:
+
+
+```{r}
+df_vst_anno <- as.data.frame(assay(vst_anno))
+# pheatmap()
+dim(df_vst_anno)
+head(df_vst_anno)
+pheatmap(df_vst_anno,fontsize_row = 2,scale = 'row')
+```
+
+The heatmap shows that samples ERR922559, ERR922560 and ERR922561 have similar sets of genes that have increased expression while they also have similar set of genes that have decreased expression. 
+
+```{r}
+# table that show the samples with assocuted disease
+head(sra_table[c('Run','disease')],)
+
+```
+
+# GO Enrichment analysis:
+
+* First find the differential gene id
+* second find the gene id for all the transcripts 
+## gene that are differentially expressed 
+
+```{r go enrichment }
+ent_gene = getBM(attributes = c('entrezgene_id'),
+                    filters = c('ensembl_gene_id'),
+                    values = df_anno_filtered$ensgene,
+                    mart = ensembl)
+ent_gene_char = as.character(ent_gene$entrezgene_id)
+```
+
+
+## all they genes present in the RNA-seq data
+```{r}
+ent_uni = getBM(attributes = c('entrezgene_id'),
+                    filters = c('ensembl_gene_id'),
+                    values = df_anno$ensgene,
+                    mart = ensembl)
+ent_uni_char = as.character(ent_uni$entrezgene_id)
+```
+## Biological processes
+
+```{r}
+ego_BP = enrichGO(
+  gene = ent_gene_char,
+  OrgDb = org.Hs.eg.db,
+  ont = 'BP',
+  universe = ent_uni_char
+)
+
+
+```
+
+## barplot
+
+```{r}
+barplot(ego_BP,showCategory = 20,font.size = 7)
+```
+
+## 
+
+```{r}
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+```
+
+
+
+
+
+```{r}
+
+
+```
+
+
+
+
+
+
+
